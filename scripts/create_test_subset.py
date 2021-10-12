@@ -166,12 +166,12 @@ def _copy_files_in_dict(d, dataset: str):
             f'gs://cpg-{dataset}-main', f'gs://cpg-{dataset}-test'
         )
         if not file_exists(new_path):
-            cmd = f'gsutil -u {dataset} cp "{old_path}" "{new_path}"'
+            cmd = f'gsutil cp "{old_path}" "{new_path}"'
             logger.info(f'Copying file in metadata: {cmd}')
             subprocess.run(cmd, check=False, shell=True)
         for suf in ['.tbi', '.md5']:
             if file_exists(old_path + suf) and not file_exists(new_path + suf):
-                cmd = f'gsutil -u {dataset} cp "{old_path + suf}" "{new_path + suf}"'
+                cmd = f'gsutil cp "{old_path + suf}" "{new_path + suf}"'
                 logger.info(f'Copying extra file in metadata: {cmd}')
                 subprocess.run(cmd, check=False, shell=True)
         return new_path
