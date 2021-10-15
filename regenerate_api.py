@@ -14,7 +14,7 @@ import requests
 
 DOCKER_IMAGE = os.getenv('SM_DOCKER')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:8000/openapi.json')
-MODULE_NAME = 'sample_metadata'
+MODULE_NAME = 'sample_metadata.generated_api'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
