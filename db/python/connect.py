@@ -75,7 +75,7 @@ class DatabaseConfiguration:
             username=os.environ.get('SM_DEV_DB_USER', 'root'),
             password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
             host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
-            port=os.environ.get('SM_DEV_DB_PORT', '3306'),
+            port=str(os.environ.get('SM_DEV_DB_PORT', '3306')),
         )
 
 
@@ -97,7 +97,7 @@ class SMConnections:
         creds_from_env = os.getenv('SM_DBCREDS')
         if creds_from_env is not None:
             config = DatabaseConfiguration(**json.loads(creds_from_env))
-            logger.info(f'Using supplied SM DB CREDS: {config.host}')
+            logger.info(f'Using supplied SM DB CREDS: {config.host}:{config.port}')
 
         SMConnections._credentials = config
 

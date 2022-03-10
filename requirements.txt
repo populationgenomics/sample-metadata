@@ -10,3 +10,5 @@ python-multipart==0.0.5
 uvicorn==0.13.4
 databases[mysql]==0.4.3
 cryptography==36.0.1
+python-dateutil
+urllib3 >= 1.25.3

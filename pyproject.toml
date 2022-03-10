@@ -1,4 +1,4 @@
 [tool.black]
 line-length = 88
 skip-string-normalization = true
-exclude = "sample_metadata/"
+exclude = "sample_metadata/|test/test_api.py"

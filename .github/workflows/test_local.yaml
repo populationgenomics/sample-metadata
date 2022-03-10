@@ -1,0 +1,120 @@
+name: Deploy locally and unittest
+on: [push, pull_request]
+jobs:
+  deploy_locally_and_unittest:
+    runs-on: ubuntu-latest
+    env:
+      SM_ENVIRONMENT: LOCAL
+      SM_DEV_DB_PROJECT: dev
+      SM_DEV_DB_HOST: '127.0.0.1'
+      SM_DEV_DB_PORT: '3307'
+      SM_DEV_DB_USER: root
+      SM_DEV_DB_PASSWORD: root
+      PROJECT: test_input_project
+      ANALYSIS_PROJECT: test_output_project
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@main
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: "gcloud setup"
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: sample-metadata
+          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
+          export_default_credentials: true
+
+      - name: "gcloud docker auth"
+        run: |
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+
+      - name: "install apt-get packages"
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+          mysql-client python3 python3-pip default-jdk
+
+      - name: "start mariadb server"
+        run: |
+          docker stop $NAME
+          docker rm $NAME
+          docker run -d -p $SM_DEV_DB_PORT:3306 \
+          -e MARIADB_ROOT_PASSWORD=$SM_DEV_DB_PASSWORD --name $NAME mariadb
+          docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" $NAME
+          # Wait until started
+          until mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
+          -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+          -e 'show databases;'; do sleep 3; done
+        env:
+          NAME: mariadb-sm
+
+      - name: "create a database"
+        run: |
+          mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
+          -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+          -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'
+          mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
+          -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+          -e 'show databases;'
+
+      - name: "run liquibase"
+        run: |
+          pushd db
+          if [ ! -e mariadb-java-client-2.7.3.jar ]; then
+            gsutil cp gs://cpg-us-sample-metadata-ci/mariadb-java-client-2.7.3.jar .
+          fi
+          if [ ! -e liquibase.jar ]; then
+            gsutil cp gs://cpg-us-sample-metadata-ci/liquibase.jar .
+          fi
+          java -jar liquibase.jar \
+          --url jdbc:mariadb://$SM_DEV_DB_HOST:$SM_DEV_DB_PORT/$SM_DEV_DB_PROJECT \
+          --username=$SM_DEV_DB_USER \
+          --password=$SM_DEV_DB_PASSWORD \
+          --classpath mariadb-java-client-2.7.3.jar \
+          --changelogFile=project.xml \
+          update
+          mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
+          -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD $SM_DEV_DB_PROJECT \
+          -e 'show tables;'
+          popd
+
+      - name: "add database projects"
+        run: |
+          mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
+          -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD $SM_DEV_DB_PROJECT \
+          -e 'insert into project \
+          (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) \
+          values \
+          (1, "'$PROJECT'", "'$USER'", "'$PROJECT'", "'$GCP_ID'", \
+          "'$PROJECT'-ci-sample-metadata-main-read-members-cache", \
+          "'$PROJECT'-ci-sample-metadata-main-write-members-cache"), \
+          (2, "'$ANALYSIS_PROJECT'", "'$USER'", "'$ANALYSIS_PROJECT'", "'$GCP_ID'", \
+          "'$ANALYSIS_PROJECT'-ci-sample-metadata-main-read-members-cache", \
+          "'$ANALYSIS_PROJECT'-ci-sample-metadata-main-write-members-cache");'
+          mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
+          -u $SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD $SM_DEV_DB_PROJECT  \
+          -e 'select * from project;'
+        env:
+          USER: sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com
+          GCP_ID: sample-metadata
+
+      - name: "install python requirements"
+        run: pip install -r requirements.txt
+
+      - name: "generate python api"
+        run: python regenerate_api.py
+
+      - name: "install python api"
+        run: sudo pip install -e .
+
+      - name: "run tests"
+        run: |
+          python3 -m api.server &
+          sleep 3  # to make sure server finished starting
+          python -m unittest discover test/
+        env:
+          SM_ALLOWALLACCESS: "1"
