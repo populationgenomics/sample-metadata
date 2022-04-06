@@ -62,6 +62,7 @@ def validate_md5(job: hb.batch.job, file, md5_path=None) -> hb.batch.job:
         f"""\
 set -euxo pipefail
 gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+for i in 1 2 3; do {{ gsutil cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5 }} && break || {{ echo "Sleeping" && sleep 20 }}; done
 gsutil cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
 diff <(cat /tmp/uploaded.md5) <(gsutil cat {md5} | cut -d " " -f1)
     """
