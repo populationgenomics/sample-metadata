@@ -30,6 +30,18 @@ class PedRow:
         'notes': {'notes'},
     }
 
+    def as_row(self, empty_participant_value=None):
+        """Get the row as ordered in the header"""
+        return [
+            self.family_id,
+            self.individual_id,
+            self.paternal_id or empty_participant_value,
+            self.maternal_id or empty_participant_value,
+            self.sex,
+            self.affected,
+            self.notes or '',
+        ]
+
     @staticmethod
     def default_header():
         """Default header (corresponds to the __init__ keys)"""
@@ -111,9 +123,9 @@ class PedRow:
             )
 
         sl = sex.lower()
-        if sl == 'm':
+        if sl in ('m', 'male'):
             return 1
-        if sl == 'f':
+        if sl in ('f', 'female'):
             return 2
         if sl == 'sex':
             raise ValueError(
@@ -152,7 +164,7 @@ class PedRow:
         return f'PedRow: {self.individual_id} ({self.sex})'
 
     @staticmethod
-    def order(rows: List['PedRow']) -> List['PedRow']:
+    def order(rows: List) -> List:
         """
         Order a list of PedRows, but also validates:
         - There are no circular dependencies

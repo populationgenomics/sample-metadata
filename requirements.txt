@@ -1,5 +1,6 @@
 # requirements are for running the server
 cpg-utils
+click==8.0.4
 requests==2.25.1
 google-auth==1.35.0
 google-cloud-secret-manager==2.8.0
