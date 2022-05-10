@@ -338,4 +338,17 @@
 		<!-- True values 'genome', 'exome', 'single-cell' and now 'mtseq' but maintaining old 'wgs' for system version tables -->
 		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'mtseq', 'wgs');</sql>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-04-19_secrets-to-groups">
+
+		<renameColumn
+            newColumnName="read_secret_name"
+            oldColumnName="read_group_name"
+            tableName="project"
+		/>
+		<renameColumn
+			newColumnName="write_secret_name"
+            oldColumnName="write_group_name"
+            tableName="project"
+		/>
+	</changeSet>
 </databaseChangeLog>

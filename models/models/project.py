@@ -9,8 +9,8 @@ class ProjectRow(SMBase):
     name: Optional[str] = None
     gcp_id: Optional[str] = None
     dataset: Optional[str] = None
-    read_secret_name: Optional[str] = None
-    write_secret_name: Optional[str] = None
+    read_group_name: Optional[str] = None
+    write_group_name: Optional[str] = None
 
     @staticmethod
     def from_db(kwargs):

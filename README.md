@@ -9,9 +9,8 @@ There are three components to the sample-metadata system:
 - An installable python library that wraps the Python web API (using OpenAPI generator)
 
 Every resource in sample-metadata belongs to a project. All resources are access
-controlled through membership of the google groups:
-`$dataset-sample-metadata-main-{read,write}`. Note that members of google-groups
-are cached in a secret as group-membership identity checks are slow.
+controlled through membership of specified google groups. Note that members of google-groups
+are cached in a group as group-membership identity checks are slow.
 
 
 ## Structure
@@ -272,24 +271,4 @@ Or you can build the docker file, and specify that
 export SM_DOCKER="cpg/sample-metadata-server:dev"
 docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
 python regenerate_apy.py
-```
-
-
-
-## Deployment
-
-The sample-metadata server
-
-You'll want to complete the following steps:
-
-- Ensure there is a database created for each project (with the database name being the project),
-- Ensure there are secrets in `projects/sample_metadata/secrets/databases/versions/latest`, that's an array of objects with keys `dbname, host, port, username, password`.
-- Ensure `google-cloud` was installed
-
-```bash
-export SM_ENVIRONMENT='PRODUCTION'
-
-# OR, point to the dev instance with
-export SM_ENVIRONMENT='DEVELOPMENT'
-
 ```

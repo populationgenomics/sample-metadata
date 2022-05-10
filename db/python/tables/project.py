@@ -6,15 +6,17 @@ import os
 from datetime import datetime, timedelta
 
 from databases import Database
-from google.cloud import secretmanager
 
 from db.python.utils import ProjectId, Forbidden, NoProjectAccess, get_logger
 from models.models.project import ProjectRow
+
+from cpg_utils.permissions import get_group_members
 
 # minutes
 PROJECT_CACHE_LENGTH = 1
 PERMISSIONS_CACHE_LENGTH = 1
 _ALLOW_FULL_ACCESS = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in ('y', 'true', '1')
+PROJECT_CREATORS_GROUP = os.getenv('SM_PROJECT_CREATORS_GROUP')
 
 
 def is_full_access():
@@ -68,24 +70,6 @@ class ProjectPermissionsTable:
         self.allow_full_access = (
             allow_full_access if allow_full_access is not None else is_full_access()
         )
-
-    def _get_secret_manager_client(self):
-        if not self._cached_client:
-            self._cached_client = secretmanager.SecretManagerServiceClient()
-        return self._cached_client
-
-    def _read_secret(self, project_id: str, secret_name: str):
-        """Reads the latest version of a GCP Secret Manager secret.
-        Returns None if the secret doesn't exist."""
-
-        secret_manager = self._get_secret_manager_client()
-        secret_path = secret_manager.secret_path(project_id, secret_name)
-
-        response = secret_manager.access_secret_version(
-            request={'name': f'{secret_path}/versions/latest'}
-        )
-
-        return response.payload.data.decode('UTF-8')
 
     async def check_access_to_project_ids(
         self,
@@ -159,23 +143,22 @@ class ProjectPermissionsTable:
         ):
             project_id_map = await self.get_project_id_map()
             project = project_id_map[project_id]
-            secret_name = (
-                project.read_secret_name if readonly else project.write_secret_name
+            group_name = (
+                project.read_group_name if readonly else project.write_group_name
             )
-            if secret_name is None:
+            if group_name is None:
                 project_name = (await self.get_project_id_map())[project_id].name
                 read_or_write = 'read' if readonly else 'write'
                 raise Exception(
                     f'An internal error occurred when validating access to {project_name}, '
-                    f'there must be a value in the DB for "{read_or_write}_secret_name" to lookup'
+                    f'there must be a value in the DB for "{read_or_write}_group_name" to lookup'
                 )
 
             try:
                 start = datetime.utcnow()
-                assert project.gcp_id is not None
-                response = self._read_secret(project.gcp_id, secret_name)
+                response = get_group_members(group_name)
                 logger.debug(
-                    f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check sm://{secret_name}'
+                    f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check group access for {group_name}'
                 )
 
             except Exception as e:
@@ -273,8 +256,9 @@ class ProjectPermissionsTable:
         if self.allow_full_access:
             return True
 
-        response = self._read_secret('sample-metadata', 'project-creator-users')
-        if author not in set(response.split(',')):
+        assert PROJECT_CREATORS_GROUP
+        members = get_group_members(PROJECT_CREATORS_GROUP)
+        if author.lower() not in members:
             raise Forbidden(f'{author} does not have access to creating project')
 
         return True
