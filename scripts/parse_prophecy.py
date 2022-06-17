@@ -57,6 +57,14 @@ class Columns:
         return {k: COLUMN_MAP[k] for k in fields}
 
 
+def fastq_file_name_to_sample_id(filename: str) -> str:
+    """
+    HG3FMDSX3_2_220208_FD02700641_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_PROPHECY_M002_R1.
+    -> 220208_FD02700641
+    """
+    return '_'.join(filename.split('_')[2:4])
+
+
 class ProphecyParser(GenericMetadataParser):
     """Parser for Prophecy manifests"""
 
@@ -88,13 +96,6 @@ class ProphecyParser(GenericMetadataParser):
         reader = csv.DictReader(file_pointer, delimiter=delimiter)
         return reader
 
-    def fastq_file_name_to_sample_id(self, filename: str) -> str:
-        """
-        HG3FMDSX3_2_220208_FD02700641_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_PROPHECY_M002_R1.
-        -> 220208_FD02700641
-        """
-        return '_'.join(filename.split('_')[2:4])
-
     async def get_read_filenames(
         self, sample_id: Optional[str], row: SingleRow
     ) -> List[str]:
@@ -105,7 +106,7 @@ class ProphecyParser(GenericMetadataParser):
         return [
             path
             for filename, path in self.filename_map.items()
-            if self.fastq_file_name_to_sample_id(filename) == sample_id
+            if fastq_file_name_to_sample_id(filename) == row[Columns.SAMPLE_NAME]
         ]
 
 
