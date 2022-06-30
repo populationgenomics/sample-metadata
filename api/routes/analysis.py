@@ -4,7 +4,7 @@ from datetime import date
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter
-from fastapi.params import Body
+from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
@@ -14,9 +14,10 @@ from api.utils.db import (
     get_project_write_connection,
     Connection,
 )
+from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import AnalysisType, AnalysisStatus
+from models.enums import AnalysisType, AnalysisStatus, SequenceType
 from models.models.analysis import Analysis
 from models.models.sample import (
     sample_id_transform_to_raw_list,
@@ -277,11 +278,13 @@ async def get_analysis_runner_log(
 
 
 @router.get(
-    '/{project}/sample-cram-path-map/tsv',
-    operation_id='getSampleReadsMapForSeqr',
-    response_class=StreamingResponse,
+    '/{project}/sample-cram-path-map',
+    operation_id='getSamplesReadsMap',
+    tags=['seqr'],
 )
-async def get_sample_reads_map_for_seqr(
+async def get_sample_reads_map(
+    export_type: ExportType = ExportType.JSON,
+    sequence_types: List[SequenceType] = Query(...),
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -296,16 +299,26 @@ async def get_sample_reads_map_for_seqr(
 
     at = AnalysisLayer(connection)
     assert connection.project
-    rows = await at.get_sample_cram_path_map_for_seqr(project=connection.project)
+    objs = await at.get_sample_cram_path_map_for_seqr(
+        project=connection.project, sequence_types=sequence_types
+    )
+
+    if export_type == ExportType.JSON:
+        return objs
+
+    keys = ['participant_id', 'output', 'sample_id']
+    rows = [[r[k] for k in keys] for r in objs]
 
     output = io.StringIO()
-    writer = csv.writer(output, delimiter='\t')
+    writer = csv.writer(output, delimiter=export_type.get_delimiter())
     writer.writerows(rows)
 
     basefn = f'{connection.project}-seqr-igv-paths-{date.today().isoformat()}'
 
     return StreamingResponse(
         iter(output.getvalue()),
-        media_type='text/tab-separated-values',
-        headers={'Content-Disposition': f'filename={basefn}.tsv'},
+        media_type=export_type.get_mime_type(),
+        headers={
+            'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
+        },
     )

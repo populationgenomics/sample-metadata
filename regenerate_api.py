@@ -14,7 +14,8 @@ import subprocess
 import requests
 
 DOCKER_IMAGE = os.getenv('SM_DOCKER')
-SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:8000/openapi.json')
+PORT = os.getenv('PORT', '8000')
+SCHEMA_URL = os.getenv('SM_SCHEMAURL', f'http://localhost:{PORT}/openapi.json')
 OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
 MODULE_NAME = 'sample_metadata'
 

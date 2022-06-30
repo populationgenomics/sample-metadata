@@ -2,7 +2,6 @@
 import io
 import csv
 import codecs
-from enum import Enum
 from datetime import date
 from typing import List, Optional
 
@@ -16,20 +15,13 @@ from api.utils.db import (
     get_project_write_connection,
     Connection,
 )
-from api.utils.extensions import guess_delimiter_by_filename
+from api.utils.export import ExportType
+from api.utils.extensions import guess_delimiter_by_upload_file_obj
 from db.python.layers.family import FamilyLayer, PedRow
 from models.models.family import Family
 from models.models.sample import sample_id_transform_to_raw_list
 
 router = APIRouter(prefix='/family', tags=['family'])
-
-
-class ContentType(Enum):
-    """Enum for available content type options for get pedigree endpoint"""
-
-    CSV = 'csv'
-    TSV = 'tsv'
-    JSON = 'json'
 
 
 class FamilyUpdateModel(BaseModel):
@@ -50,7 +42,7 @@ async def import_pedigree(
     connection: Connection = get_project_write_connection,
 ):
     """Import a pedigree"""
-    delimiter = guess_delimiter_by_filename(file.filename)
+    delimiter = guess_delimiter_by_upload_file_obj(file)
     family_layer = FamilyLayer(connection)
     reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
     headers = None
@@ -76,7 +68,7 @@ async def import_pedigree(
 @router.get('/{project}/pedigree', operation_id='getPedigree', tags=['seqr'])
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
-    response_type: ContentType = ContentType.JSON,
+    export_type: ExportType = ExportType.JSON,
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
     include_header: bool = True,
@@ -103,39 +95,39 @@ async def get_pedigree(
         include_participants_not_in_families=include_participants_not_in_families,
     )
 
-    if response_type in (ContentType.CSV, ContentType.TSV):
-        delim = '\t' if response_type == ContentType.TSV else ','
-        output = io.StringIO()
-        writer = csv.writer(output, delimiter=delim)
+    if export_type == ExportType.JSON:
+        return pedigree_dicts
 
-        if include_header:
-            writer.writerow(PedRow.row_header())
+    delim = '\t' if export_type == ExportType.TSV else ','
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=delim)
 
-        keys = [
-            'family_id',
-            'individual_id',
-            'paternal_id',
-            'maternal_id',
-            'sex',
-            'affected',
-        ]
-        pedigree_rows = [[(row[k] or '') for k in keys] for row in pedigree_dicts]
-        writer.writerows(pedigree_rows)
+    if include_header:
+        writer.writerow(PedRow.row_header())
 
-        basefn = f'{connection.project}-{date.today().isoformat()}'
+    keys = [
+        'family_id',
+        'individual_id',
+        'paternal_id',
+        'maternal_id',
+        'sex',
+        'affected',
+    ]
+    pedigree_rows = [[(row[k] or '') for k in keys] for row in pedigree_dicts]
+    writer.writerows(pedigree_rows)
 
-        if internal_family_ids:
-            basefn += '-'.join(str(fm) for fm in internal_family_ids)
+    basefn = f'{connection.project}-{date.today().isoformat()}'
 
-        extension = 'ped' if response_type == ContentType.TSV else 'csv'
+    if internal_family_ids:
+        basefn += '-'.join(str(fm) for fm in internal_family_ids)
 
-        return StreamingResponse(
-            iter(output.getvalue()),
-            media_type=f'text/{response_type}',
-            headers={'Content-Disposition': f'filename={basefn}.{extension}'},
-        )
-
-    return pedigree_dicts
+    return StreamingResponse(
+        iter(output.getvalue()),
+        media_type=export_type.get_mime_type(),
+        headers={
+            'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
+        },
+    )
 
 
 @router.get('/{project}/', operation_id='getFamilies', tags=['seqr'])
@@ -174,11 +166,11 @@ async def update_family(
 async def import_families(
     file: UploadFile = File(...),
     has_header: bool = True,
-    delimiter='\t',
+    delimiter: str = None,
     connection: Connection = get_project_write_connection,
 ):
     """Import a family csv"""
-    delimiter = guess_delimiter_by_filename(file.filename, default_delimiter=delimiter)
+    delimiter = guess_delimiter_by_upload_file_obj(file, default_delimiter=delimiter)
 
     family_layer = FamilyLayer(connection)
     reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)

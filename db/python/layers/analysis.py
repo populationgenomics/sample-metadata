@@ -6,7 +6,7 @@ from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
 
-from models.enums import AnalysisStatus, AnalysisType
+from models.enums import AnalysisStatus, AnalysisType, SequenceType
 from models.models.analysis import Analysis
 from models.models.sample import sample_id_format_list
 
@@ -96,10 +96,12 @@ class AnalysisLayer(BaseLayer):
         return await self.at.get_incomplete_analyses(project=project)
 
     async def get_sample_cram_path_map_for_seqr(
-        self, project: ProjectId
-    ) -> List[List[str]]:
+        self, project: ProjectId, sequence_types: list[SequenceType]
+    ) -> List[dict[str, Any]]:
         """Get (ext_participant_id, cram_path, internal_id) map"""
-        return await self.at.get_sample_cram_path_map_for_seqr(project=project)
+        return await self.at.get_sample_cram_path_map_for_seqr(
+            project=project, sequence_types=sequence_types
+        )
 
     async def query_analysis(
         self,

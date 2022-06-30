@@ -10,7 +10,7 @@ from db.python.layers.participant import (
     ParticipantLayer,
     ExtraParticipantImporterHandler,
 )
-from api.utils.extensions import guess_delimiter_by_filename
+from api.utils.extensions import guess_delimiter_by_upload_file_obj
 from api.utils.db import get_project_write_connection, Connection
 
 router = APIRouter(prefix='/import', tags=['import'])
@@ -47,7 +47,7 @@ async def import_individual_metadata_manifest(
         add a PARTICIPANT entry for them
     """
 
-    delimiter = guess_delimiter_by_filename(file.filename, default_delimiter=delimiter)
+    delimiter = guess_delimiter_by_upload_file_obj(file)
 
     player = ParticipantLayer(connection)
     csvreader = csv.reader(
