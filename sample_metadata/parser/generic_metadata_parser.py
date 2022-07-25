@@ -307,17 +307,17 @@ class GenericMetadataParser(GenericParser):
                     self.get_all_files_from_row(self.get_sample_id(r), r)
                 )
 
-        filenames: List[str] = sum(await asyncio.gather(*filename_promises), [])
-        fs = set(f.strip() for f in filenames if f and f.strip())
+        files_from_rows: List[str] = sum(await asyncio.gather(*filename_promises), [])
+        filenames_from_rows = set(f.strip() for f in files_from_rows if f and f.strip())
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
 
         def filename_filter(f):
             return any(f.endswith(ext) for ext in relevant_extensions)
 
-        relevant_mapped_files = set(filter(filename_filter, self.filename_map.keys()))
+        file_from_search_paths = set(filter(filename_filter, self.filename_map.keys()))
 
-        missing_files = relevant_mapped_files - fs
-        files_in_search_path_not_in_map = fs - relevant_mapped_files
+        files_in_search_path_not_in_map = file_from_search_paths - filenames_from_rows
+        missing_files = filenames_from_rows - file_from_search_paths
 
         errors = []
 

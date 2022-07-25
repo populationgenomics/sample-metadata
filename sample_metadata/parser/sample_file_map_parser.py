@@ -25,6 +25,7 @@ KeyMap = {
         'participant-id',
         'participant_id',
         'participant id',
+        "agha_study_id",
     ],
     SAMPLE_ID_COL_NAME: ['sample_id', 'sample', 'sample id'],
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
